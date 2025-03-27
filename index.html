@@ -83,6 +83,13 @@
             width: 100%;
         }
 
+        #timer {
+            margin-top: 10px;
+            font-size: 1.1em;
+            color: #e74c3c;
+            text-align: center;
+        }
+
         .button-container {
             margin-top: 20px;
             display: flex;
@@ -115,6 +122,7 @@
     <div id="game-container">
         <div id="board"></div>
         <div id="status">Current Player: Black</div>
+        <div id="timer">Time Left: 10s</div>
         <div class="button-container">
             <button id="pvp">Player vs Player</button>
             <button id="pvc">Player vs Computer</button>
@@ -124,10 +132,13 @@
 
     <script>
         const SIZE = 15;
+        const TIME_LIMIT = 10; // seconds
         const board = [];
         let currentPlayer = 'black';
         let gameOver = false;
         let isComputerMode = false;
+        let timer;
+        let timeLeft;
 
         function createBoard() {
             const boardElement = document.getElementById('board');
@@ -151,6 +162,29 @@
             }
         }
 
+        function startTimer() {
+            clearInterval(timer);
+            timeLeft = TIME_LIMIT;
+            document.getElementById('timer').textContent = `Time Left: ${timeLeft}s`;
+            
+            timer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').textContent = `Time Left: ${timeLeft}s`;
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    forceRandomMove();
+                }
+            }, 1000);
+        }
+
+        function forceRandomMove() {
+            const move = findRandomMove();
+            if (move) {
+                placeStone(move.row, move.col, currentPlayer);
+                checkAndSwitchPlayer(move.row, move.col);
+            }
+        }
+
         function handleCellClick(e) {
             if (gameOver) return;
 
@@ -158,19 +192,12 @@
             const col = parseInt(e.target.dataset.col);
 
             if (!board[row][col]) {
+                clearInterval(timer);
                 placeStone(row, col, currentPlayer);
-                
-                if (checkWin(row, col)) {
-                    document.getElementById('status').textContent = `${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)} wins!`;
-                    gameOver = true;
-                    return;
-                }
-
-                currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
-                document.getElementById('status').textContent = `Current Player: ${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)}`;
+                checkAndSwitchPlayer(row, col);
 
                 if (isComputerMode && currentPlayer === 'white' && !gameOver) {
-                    setTimeout(computerMove, 500); // Slight delay for better UX
+                    setTimeout(computerMove, 500);
                 }
             }
         }
@@ -183,25 +210,137 @@
             cell.appendChild(stone);
         }
 
+        function checkAndSwitchPlayer(row, col) {
+            if (checkWin(row, col)) {
+                document.getElementById('status').textContent = `${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)} wins!`;
+                gameOver = true;
+                clearInterval(timer);
+                return;
+            }
+
+            currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+            document.getElementById('status').textContent = `Current Player: ${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)}`;
+            if (!gameOver) startTimer();
+        }
+
         function computerMove() {
-            // Simple AI strategy:
-            // 1. Look for winning move
-            // 2. Block player's winning move
-            // 3. Place near existing stones
-            let move = findWinningMove('white') || findWinningMove('black') || findStrategicMove();
-            
+            clearInterval(timer);
+            const move = findBestMove('white');
             if (move) {
                 placeStone(move.row, move.col, 'white');
-                
-                if (checkWin(move.row, move.col)) {
-                    document.getElementById('status').textContent = 'White (Computer) wins!';
-                    gameOver = true;
-                    return;
-                }
-                
-                currentPlayer = 'black';
-                document.getElementById('status').textContent = 'Current Player: Black';
+                checkAndSwitchPlayer(move.row, move.col);
             }
+        }
+
+        function findBestMove(player) {
+            // Immediate win or block
+            let move = findWinningMove('white') || findWinningMove('black');
+            if (move) return move;
+
+            // Minimax with depth 2
+            let bestScore = -Infinity;
+            let bestMove = null;
+            const depth = 2;
+
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (!board[i][j]) {
+                        board[i][j] = player;
+                        const score = minimax(depth - 1, false, -Infinity, Infinity);
+                        board[i][j] = null;
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMove = { row: i, col: j };
+                        }
+                    }
+                }
+            }
+            return bestMove || findRandomMove();
+        }
+
+        function minimax(depth, isMaximizing, alpha, beta) {
+            if (depth === 0) return evaluateBoard();
+
+            if (isMaximizing) {
+                let maxEval = -Infinity;
+                for (let i = 0; i < SIZE; i++) {
+                    for (let j = 0; j < SIZE; j++) {
+                        if (!board[i][j]) {
+                            board[i][j] = 'white';
+                            const eval = minimax(depth - 1, false, alpha, beta);
+                            board[i][j] = null;
+                            maxEval = Math.max(maxEval, eval);
+                            alpha = Math.max(alpha, eval);
+                            if (beta <= alpha) break;
+                        }
+                    }
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (let i = 0; i < SIZE; i++) {
+                    for (let j = 0; j < SIZE; j++) {
+                        if (!board[i][j]) {
+                            board[i][j] = 'black';
+                            const eval = minimax(depth - 1, true, alpha, beta);
+                            board[i][j] = null;
+                            minEval = Math.min(minEval, eval);
+                            beta = Math.min(beta, eval);
+                            if (beta <= alpha) break;
+                        }
+                    }
+                }
+                return minEval;
+            }
+        }
+
+        function evaluateBoard() {
+            let score = 0;
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (board[i][j]) {
+                        score += evaluatePosition(i, j, board[i][j]);
+                    }
+                }
+            }
+            return score;
+        }
+
+        function evaluatePosition(row, col, player) {
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+            let score = 0;
+            const isWhite = player === 'white';
+
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                let openEnds = 0;
+
+                // Positive direction
+                for (let i = 1; i < 5; i++) {
+                    const r = row + dr * i;
+                    const c = col + dc * i;
+                    if (r < 0 || r >= SIZE || c < 0 || c >= SIZE || board[r][c] !== player) {
+                        if (r >= 0 && r < SIZE && c >= 0 && c < SIZE && !board[r][c]) openEnds++;
+                        break;
+                    }
+                    count++;
+                }
+
+                // Negative direction
+                for (let i = 1; i < 5; i++) {
+                    const r = row - dr * i;
+                    const c = col - dc * i;
+                    if (r < 0 || r >= SIZE || c < 0 || c >= SIZE || board[r][c] !== player) {
+                        if (r >= 0 && r < SIZE && c >= 0 && c < SIZE && !board[r][c]) openEnds++;
+                        break;
+                    }
+                    count++;
+                }
+
+                if (count >= 5) return isWhite ? 10000 : -10000;
+                score += (isWhite ? 1 : -1) * (count * count) * (openEnds + 1);
+            }
+            return score;
         }
 
         function findWinningMove(player) {
@@ -220,33 +359,6 @@
             return null;
         }
 
-        function findStrategicMove() {
-            // Look for empty spots near existing stones
-            for (let i = 0; i < SIZE; i++) {
-                for (let j = 0; j < SIZE; j++) {
-                    if (!board[i][j] && hasNeighbor(i, j)) {
-                        return { row: i, col: j };
-                    }
-                }
-            }
-            // If no strategic move, place in center or random
-            return board[7][7] === null ? { row: 7, col: 7 } : findRandomMove();
-        }
-
-        function hasNeighbor(row, col) {
-            for (let dr = -1; dr <= 1; dr++) {
-                for (let dc = -1; dc <= 1; dc++) {
-                    if (dr === 0 && dc === 0) continue;
-                    const r = row + dr;
-                    const c = col + dc;
-                    if (r >= 0 && r < SIZE && c >= 0 && c < SIZE && board[r][c]) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
         function findRandomMove() {
             const emptyCells = [];
             for (let i = 0; i < SIZE; i++) {
@@ -258,30 +370,21 @@
         }
 
         function checkWin(row, col) {
-            const directions = [
-                [0, 1],  // horizontal
-                [1, 0],  // vertical
-                [1, 1],  // diagonal down-right
-                [1, -1]  // diagonal down-left
-            ];
-
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
             for (let [dr, dc] of directions) {
                 let count = 1;
-                
                 for (let i = 1; i < 5; i++) {
                     const r = row + dr * i;
                     const c = col + dc * i;
                     if (r < 0 || r >= SIZE || c < 0 || c >= SIZE || board[r][c] !== currentPlayer) break;
                     count++;
                 }
-                
                 for (let i = 1; i < 5; i++) {
                     const r = row - dr * i;
                     const c = col - dc * i;
                     if (r < 0 || r >= SIZE || c < 0 || c >= SIZE || board[r][c] !== currentPlayer) break;
                     count++;
                 }
-                
                 if (count >= 5) return true;
             }
             return false;
@@ -309,11 +412,13 @@
             gameOver = false;
             document.getElementById('status').textContent = 'Current Player: Black';
             createBoard();
+            startTimer();
         }
 
         // Initialize the game
         document.getElementById('pvp').classList.add('active');
         createBoard();
+        startTimer();
     </script>
 </body>
 </html>
