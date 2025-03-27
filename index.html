@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beautiful Backgammon</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #2c3e50, #4a6276);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .game-container {
+            background: #8B4513;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            width: 900px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(14, 1fr);
+            gap: 5px;
+            background: #D2B48C;
+            padding: 20px;
+            border: 5px solid #A0522D;
+            border-radius: 10px;
+        }
+
+        .triangle {
+            width: 50px;
+            height: 200px;
+            position: relative;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+
+        .triangle:nth-child(-n+6),
+        .triangle:nth-child(n+9):nth-child(-n+14) {
+            background: #8B0000;
+        }
+
+        .triangle:nth-child(n+7):nth-child(-n+8),
+        .triangle:nth-child(n+15) {
+            background: #FFD700;
+        }
+
+        .checker {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            position: absolute;
+            border: 2px solid #333;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .checker.black {
+            background: #1a1a1a;
+        }
+
+        .checker.white {
+            background: #f0f0f0;
+        }
+
+        .checker:hover {
+            transform: scale(1.1);
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dice-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .die {
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #FFD700;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #FFA500;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="board" id="board"></div>
+        <div class="controls">
+            <div class="dice-container">
+                <div class="die" id="die1">1</div>
+                <div class="die" id="die2">1</div>
+            </div>
+            <button onclick="rollDice()">Roll Dice</button>
+        </div>
+    </div>
+
+    <script>
+        const board = document.getElementById('board');
+        let currentPlayer = 'white';
+        
+        // Initialize board
+        function createBoard() {
+            // Create 24 triangles (12 on each side + 2 for bar/bearing off)
+            for (let i = 0; i < 14; i++) {
+                const triangle = document.createElement('div');
+                triangle.className = 'triangle';
+                triangle.dataset.position = i;
+                board.appendChild(triangle);
+            }
+            
+            // Initial checker positions
+            placeCheckers(1, 2, 'white');   // Position 1: 2 white
+            placeCheckers(12, 5, 'black'); // Position 12: 5 black
+            placeCheckers(5, 3, 'black');  // Position 5: 3 black
+            placeCheckers(7, 5, 'white');  // Position 7: 5 white
+        }
+
+        function placeCheckers(position, count, color) {
+            const triangle = board.children[position];
+            for (let i = 0; i < count; i++) {
+                const checker = document.createElement('div');
+                checker.className = `checker ${color}`;
+                checker.style.bottom = `${i * 45}px`;
+                checker.draggable = true;
+                checker.addEventListener('dragstart', dragStart);
+                triangle.appendChild(checker);
+            }
+        }
+
+        function rollDice() {
+            const die1 = Math.floor(Math.random() * 6) + 1;
+            const die2 = Math.floor(Math.random() * 6) + 1;
+            document.getElementById('die1').textContent = die1;
+            document.getElementById('die2').textContent = die2;
+        }
+
+        // Drag and drop functionality
+        function dragStart(e) {
+            e.dataTransfer.setData('text/plain', e.target.parentElement.dataset.position);
+        }
+
+        board.addEventListener('dragover', (e) => e.preventDefault());
+        
+        board.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const fromPos = e.dataTransfer.getData('text/plain');
+            const toTriangle = e.target.closest('.triangle');
+            if (toTriangle && fromPos !== toTriangle.dataset.position) {
+                const checker = board.children[fromPos].querySelector('.checker');
+                if (checker) {
+                    toTriangle.appendChild(checker);
+                    checker.style.bottom = `${(toTriangle.children.length - 1) * 45}px`;
+                }
+            }
+        });
+
+        // Start game
+        createBoard();
+    </script>
+</body>
+</html>
