@@ -3,189 +3,316 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beautiful Backgammon</title>
+    <title>Gomoku - Five in a Row</title>
     <style>
         body {
-            background: linear-gradient(135deg, #2c3e50, #4a6276);
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
         }
 
-        .game-container {
-            background: #8B4513;
+        h1 {
+            color: #333;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+
+        #game-container {
+            background: #fff;
             padding: 20px;
             border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            width: 900px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
 
-        .board {
-            display: grid;
-            grid-template-columns: repeat(14, 1fr);
-            gap: 5px;
-            background: #D2B48C;
-            padding: 20px;
-            border: 5px solid #A0522D;
-            border-radius: 10px;
+        #board {
+            background: #f0d9b5;
+            border: 2px solid #8b4513;
+            border-radius: 5px;
+            padding: 10px;
         }
 
-        .triangle {
-            width: 50px;
-            height: 200px;
+        .row {
+            display: flex;
+        }
+
+        .cell {
+            width: 30px;
+            height: 30px;
+            background: #f0d9b5;
+            border: 1px solid #b8860b;
             position: relative;
-            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
 
-        .triangle:nth-child(-n+6),
-        .triangle:nth-child(n+9):nth-child(-n+14) {
-            background: #8B0000;
+        .cell:hover {
+            background: #e6c992;
         }
 
-        .triangle:nth-child(n+7):nth-child(-n+8),
-        .triangle:nth-child(n+15) {
-            background: #FFD700;
-        }
-
-        .checker {
-            width: 40px;
-            height: 40px;
+        .stone {
+            width: 80%;
+            height: 80%;
             border-radius: 50%;
             position: absolute;
-            border: 2px solid #333;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
-        .checker.black {
-            background: #1a1a1a;
+        .black {
+            background: radial-gradient(circle at 30% 30%, #444, #000);
         }
 
-        .checker.white {
-            background: #f0f0f0;
+        .white {
+            background: radial-gradient(circle at 30% 30%, #fff, #ddd);
         }
 
-        .checker:hover {
-            transform: scale(1.1);
+        #status {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #333;
+            text-align: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            width: 100%;
         }
 
-        .controls {
+        .button-container {
             margin-top: 20px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .dice-container {
-            display: flex;
-            gap: 20px;
-        }
-
-        .die {
-            width: 60px;
-            height: 60px;
-            background: white;
-            border-radius: 10px;
-            display: flex;
+            gap: 10px;
             justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            font-weight: bold;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
 
         button {
             padding: 10px 20px;
-            background: #FFD700;
+            font-size: 1.1em;
+            background: #4a90e2;
+            color: white;
             border: none;
             border-radius: 5px;
-            font-size: 16px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: background 0.3s ease;
         }
 
         button:hover {
-            background: #FFA500;
-            transform: translateY(-2px);
+            background: #357abd;
+        }
+
+        button.active {
+            background: #2ecc71;
         }
     </style>
 </head>
 <body>
-    <div class="game-container">
-        <div class="board" id="board"></div>
-        <div class="controls">
-            <div class="dice-container">
-                <div class="die" id="die1">1</div>
-                <div class="die" id="die2">1</div>
-            </div>
-            <button onclick="rollDice()">Roll Dice</button>
+    <h1>Gomoku</h1>
+    <div id="game-container">
+        <div id="board"></div>
+        <div id="status">Current Player: Black</div>
+        <div class="button-container">
+            <button id="pvp">Player vs Player</button>
+            <button id="pvc">Player vs Computer</button>
+            <button id="restart">Restart Game</button>
         </div>
     </div>
 
     <script>
-        const board = document.getElementById('board');
-        let currentPlayer = 'white';
-        
-        // Initialize board
+        const SIZE = 15;
+        const board = [];
+        let currentPlayer = 'black';
+        let gameOver = false;
+        let isComputerMode = false;
+
         function createBoard() {
-            // Create 24 triangles (12 on each side + 2 for bar/bearing off)
-            for (let i = 0; i < 14; i++) {
-                const triangle = document.createElement('div');
-                triangle.className = 'triangle';
-                triangle.dataset.position = i;
-                board.appendChild(triangle);
-            }
-            
-            // Initial checker positions
-            placeCheckers(1, 2, 'white');   // Position 1: 2 white
-            placeCheckers(12, 5, 'black'); // Position 12: 5 black
-            placeCheckers(5, 3, 'black');  // Position 5: 3 black
-            placeCheckers(7, 5, 'white');  // Position 7: 5 white
-        }
+            const boardElement = document.getElementById('board');
+            boardElement.innerHTML = '';
 
-        function placeCheckers(position, count, color) {
-            const triangle = board.children[position];
-            for (let i = 0; i < count; i++) {
-                const checker = document.createElement('div');
-                checker.className = `checker ${color}`;
-                checker.style.bottom = `${i * 45}px`;
-                checker.draggable = true;
-                checker.addEventListener('dragstart', dragStart);
-                triangle.appendChild(checker);
+            for (let i = 0; i < SIZE; i++) {
+                board[i] = [];
+                const row = document.createElement('div');
+                row.className = 'row';
+                
+                for (let j = 0; j < SIZE; j++) {
+                    board[i][j] = null;
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.addEventListener('click', handleCellClick);
+                    row.appendChild(cell);
+                }
+                boardElement.appendChild(row);
             }
         }
 
-        function rollDice() {
-            const die1 = Math.floor(Math.random() * 6) + 1;
-            const die2 = Math.floor(Math.random() * 6) + 1;
-            document.getElementById('die1').textContent = die1;
-            document.getElementById('die2').textContent = die2;
-        }
+        function handleCellClick(e) {
+            if (gameOver) return;
 
-        // Drag and drop functionality
-        function dragStart(e) {
-            e.dataTransfer.setData('text/plain', e.target.parentElement.dataset.position);
-        }
+            const row = parseInt(e.target.dataset.row);
+            const col = parseInt(e.target.dataset.col);
 
-        board.addEventListener('dragover', (e) => e.preventDefault());
-        
-        board.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const fromPos = e.dataTransfer.getData('text/plain');
-            const toTriangle = e.target.closest('.triangle');
-            if (toTriangle && fromPos !== toTriangle.dataset.position) {
-                const checker = board.children[fromPos].querySelector('.checker');
-                if (checker) {
-                    toTriangle.appendChild(checker);
-                    checker.style.bottom = `${(toTriangle.children.length - 1) * 45}px`;
+            if (!board[row][col]) {
+                placeStone(row, col, currentPlayer);
+                
+                if (checkWin(row, col)) {
+                    document.getElementById('status').textContent = `${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)} wins!`;
+                    gameOver = true;
+                    return;
+                }
+
+                currentPlayer = currentPlayer === 'black' ? 'white' : 'black';
+                document.getElementById('status').textContent = `Current Player: ${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)}`;
+
+                if (isComputerMode && currentPlayer === 'white' && !gameOver) {
+                    setTimeout(computerMove, 500); // Slight delay for better UX
                 }
             }
+        }
+
+        function placeStone(row, col, player) {
+            board[row][col] = player;
+            const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+            const stone = document.createElement('div');
+            stone.className = `stone ${player}`;
+            cell.appendChild(stone);
+        }
+
+        function computerMove() {
+            // Simple AI strategy:
+            // 1. Look for winning move
+            // 2. Block player's winning move
+            // 3. Place near existing stones
+            let move = findWinningMove('white') || findWinningMove('black') || findStrategicMove();
+            
+            if (move) {
+                placeStone(move.row, move.col, 'white');
+                
+                if (checkWin(move.row, move.col)) {
+                    document.getElementById('status').textContent = 'White (Computer) wins!';
+                    gameOver = true;
+                    return;
+                }
+                
+                currentPlayer = 'black';
+                document.getElementById('status').textContent = 'Current Player: Black';
+            }
+        }
+
+        function findWinningMove(player) {
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (!board[i][j]) {
+                        board[i][j] = player;
+                        if (checkWin(i, j)) {
+                            board[i][j] = null;
+                            return { row: i, col: j };
+                        }
+                        board[i][j] = null;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function findStrategicMove() {
+            // Look for empty spots near existing stones
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (!board[i][j] && hasNeighbor(i, j)) {
+                        return { row: i, col: j };
+                    }
+                }
+            }
+            // If no strategic move, place in center or random
+            return board[7][7] === null ? { row: 7, col: 7 } : findRandomMove();
+        }
+
+        function hasNeighbor(row, col) {
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    const r = row + dr;
+                    const c = col + dc;
+                    if (r >= 0 && r < SIZE && c >= 0 && c < SIZE && board[r][c]) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function findRandomMove() {
+            const emptyCells = [];
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE; j++) {
+                    if (!board[i][j]) emptyCells.push({ row: i, col: j });
+                }
+            }
+            return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        }
+
+        function checkWin(row, col) {
+            const directions = [
+                [0, 1],  // horizontal
+                [1, 0],  // vertical
+                [1, 1],  // diagonal down-right
+                [1, -1]  // diagonal down-left
+            ];
+
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                
+                for (let i = 1; i < 5; i++) {
+                    const r = row + dr * i;
+                    const c = col + dc * i;
+                    if (r < 0 || r >= SIZE || c < 0 || c >= SIZE || board[r][c] !== currentPlayer) break;
+                    count++;
+                }
+                
+                for (let i = 1; i < 5; i++) {
+                    const r = row - dr * i;
+                    const c = col - dc * i;
+                    if (r < 0 || r >= SIZE || c < 0 || c >= SIZE || board[r][c] !== currentPlayer) break;
+                    count++;
+                }
+                
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        // Button event listeners
+        document.getElementById('pvp').addEventListener('click', () => {
+            isComputerMode = false;
+            document.getElementById('pvp').classList.add('active');
+            document.getElementById('pvc').classList.remove('active');
+            restartGame();
         });
 
-        // Start game
+        document.getElementById('pvc').addEventListener('click', () => {
+            isComputerMode = true;
+            document.getElementById('pvc').classList.add('active');
+            document.getElementById('pvp').classList.remove('active');
+            restartGame();
+        });
+
+        document.getElementById('restart').addEventListener('click', restartGame);
+
+        function restartGame() {
+            currentPlayer = 'black';
+            gameOver = false;
+            document.getElementById('status').textContent = 'Current Player: Black';
+            createBoard();
+        }
+
+        // Initialize the game
+        document.getElementById('pvp').classList.add('active');
         createBoard();
     </script>
 </body>
